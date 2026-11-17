@@ -154,7 +154,7 @@ test('client plugin registers, renders, switches modes, inspects and cleans up',
   })
 })
 
-test('stays dormant inside the DSH desktop shell', async (t) => {
+test('desktop shell attaches the switcher to the built-in browser pane', async (t) => {
   const shellDom = new JSDOM('<!doctype html><html><head></head><body><div id="root"></div></body></html>', {
     url: 'http://localhost/',
     pretendToBeVisual: true,
@@ -173,39 +173,69 @@ test('stays dormant inside the DSH desktop shell', async (t) => {
   )
 
   const plugin = shellRegistration.factory(() => React)
-  let effects = 0
-  let injects = 0
   const disposers = []
+  let entry = null
   const ctx = {
     effect(effect) {
-      effects += 1
       const cleanup = effect()
       if (typeof cleanup === 'function') disposers.push(cleanup)
     },
     slots: {
-      inject() {
-        injects += 1
+      inject(name, contribute) {
+        assert.equal(name, 'shell.overlay', 'registers into the frame-wide overlay slot')
+        contribute()
       },
-      register() {
-        throw new Error('the desktop shell must not register the overlay')
+      register(options, component) {
+        entry = { options, component }
+        return () => {}
       },
     },
   }
 
   plugin.apply(ctx)
+  const doc = shellDom.window.document
+  const container = doc.createElement('div')
+  doc.body.appendChild(container)
+  const root = createRoot(container)
 
-  await t.test('does not touch the DOM or the overlay slot', () => {
-    assert.equal(effects, 0, 'no effect is registered in the desktop shell')
-    assert.equal(injects, 0, 'no overlay is contributed in the desktop shell')
-    assert.equal(shellDom.window.document.getElementById('dsh-view-switcher-styles'), null)
+  await t.test('stays hidden while no browser pane is open', async () => {
+    root.render(React.createElement(entry.component))
+    await tick(120)
+    assert.equal(container.querySelector('.dsh-vs-toolbar'), null, 'no toolbar without a browser pane')
   })
 
-  await t.test('__DSH_VS_FORCE__ opts a page back in', () => {
-    shellDom.window.__DSH_VS_FORCE__ = true
-    plugin.apply(ctx)
-    assert.equal(effects, 1, 'the forced page registers its effect')
-    assert.equal(injects, 1, 'the forced page contributes the overlay')
-    assert.ok(shellDom.window.document.getElementById('dsh-view-switcher-styles') !== null)
+  await t.test('renders its toolbar over the browser frame and resizes it', async () => {
+    const frame = doc.createElement('iframe')
+    frame.setAttribute('data-sidebar-browser-frame', 'webview')
+    doc.body.appendChild(frame)
+    await tick(180)
+
+    const labels = [...container.querySelectorAll('.dsh-vs-btn')].map((node) => node.textContent)
+    assert.deepEqual(labels, ['AUTO', 'MOBILE', 'TABLET', 'DESKTOP', 'FULLHD', 'INSPECT'], 'toolbar follows the pane')
+    assert.equal(container.querySelector('.dsh-vs-toolbar').style.top, '8px', 'toolbar anchors to the frame')
+
+    const button = (label) => [...container.querySelectorAll('.dsh-vs-btn')].find((node) => node.textContent === label)
+    const click = (node) => node.dispatchEvent(new shellDom.window.MouseEvent('click', { bubbles: true, cancelable: true }))
+
+    click(button('MOBILE'))
+    await tick(80)
+    assert.equal(frame.style.width, '375px', 'MOBILE resizes the pane frame')
+    assert.equal(doc.documentElement.getAttribute('data-dsh-view-mode'), null, 'the page root is left alone')
+
+    click(button('TABLET'))
+    await tick(80)
+    assert.equal(frame.style.width, '768px', 'TABLET resizes the pane frame')
+
+    click(button('AUTO'))
+    await tick(80)
+    assert.equal(frame.style.width, '', 'AUTO hands the width back to the layout')
+    frame.remove()
+  })
+
+  await t.test('cleanup releases the overlay', async () => {
+    root.unmount()
+    await tick(60)
     for (const dispose of disposers) dispose()
+    assert.equal(doc.getElementById('dsh-view-switcher-styles'), null, 'cleanup removes the style element')
   })
 })

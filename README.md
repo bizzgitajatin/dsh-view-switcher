@@ -77,19 +77,27 @@ dsh plugin --profile web add github:bizzgitajatin/dsh-view-switcher
 
 ## Penggunaan
 
-- **Mode tampilan**: toolbar di kanan atas; klik salah satu tombol mode.
+- **Panel Browser bawaan DSH**: buka sebuah halaman di tab Browser. Toolbar
+  menempel di sudut kanan atas panel itu, dan tombol mode mengubah lebar halaman
+  di dalam panel (AUTO = selebar panel). Berlaku untuk iframe (DSH web) maupun
+  `<webview>` (DSH desktop), karena keduanya ditandai
+  `[data-sidebar-browser-frame]`.
+- **Tampilan web DSH tanpa panel browser**: toolbar tetap di kanan atas dan
+  mengatur lebar konten web view (`#root`).
 - **Inspektur**: tekan `F1` (kursor jadi crosshair), hover untuk melihat
   selector dan kotak sorot, klik untuk menyalin. Klik pertama tidak diteruskan
-  ke aplikasi; mode keluar dengan `Esc` atau `F1`.
+  ke aplikasi; mode keluar dengan `Esc` atau `F1`. Inspektur bekerja pada DOM
+  DSH, bukan isi halaman di dalam panel browser (panel itu cross-origin).
 
 ### Khusus DSH desktop (Electron)
 
-Di dalam aplikasi DSH desktop, plugin **tidak** menampilkan toolbar: ukuran
-jendela diatur OS, jadi toolbar di sana hanya bertabrakan dengan tombol
-minimize/maximize/close. Plugin mendeteksi shell desktop (`Electron/` pada user
-agent, protokol `dsh-app:`, atau bridge `dsh`/`dshPlatform`) lalu berhenti diam.
-Toolbar hanya aktif di tampilan web DSH (browser). Halaman yang memang ingin
-memaksa tampil — seperti halaman demo — bisa menyetel `window.__DSH_VS_FORCE__ = true`.
+Di dalam aplikasi DSH desktop, plugin **tidak** menaruh toolbar di jendela
+utama (ukuran jendela diatur OS, jadi toolbar di sana hanya bertabrakan dengan
+tombol minimize/maximize/close). Toolbar hanya muncul saat ada panel Browser
+terbuka, dan menempel pada panel tersebut. Plugin mendeteksi shell desktop
+(`Electron/` pada user agent, protokol `dsh-app:`, atau bridge
+`dsh`/`dshPlatform`). Halaman yang memang ingin memaksa tampil — seperti halaman
+demo — bisa menyetel `window.__DSH_VS_FORCE__ = true`.
 
 ## Demo lokal
 

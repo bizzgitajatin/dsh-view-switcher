@@ -140,15 +140,79 @@ function copyText(text) {
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
+/** The built-in browser pane: an `<iframe>` on the web UI, a `<webview>` on desktop. */
+const FRAME_SELECTOR = '[data-sidebar-browser-frame]';
+/**
+ * DSH marks both the web (iframe) and desktop (webview) browser panes with
+ * `data-sidebar-browser-frame`. Returns the visible one, or null when no pane
+ * is open.
+ */
+function findBrowserFrame() {
+    const frames = Array.from(document.querySelectorAll(FRAME_SELECTOR));
+    let fallback = null;
+    for (const frame of frames) {
+        const rect = frame.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0)
+            return frame;
+        fallback ??= frame;
+    }
+    return fallback;
+}
+/** Resize the pane frame itself; AUTO hands the width back to the layout. */
+function resizeFrame(frame, mode) {
+    const width = WIDTH[mode];
+    if (width === null) {
+        frame.style.removeProperty('width');
+        frame.style.removeProperty('max-width');
+        frame.style.removeProperty('margin-inline');
+        return;
+    }
+    frame.style.width = `${width}px`;
+    frame.style.maxWidth = '100%';
+    frame.style.marginInline = 'auto';
+}
 function createOverlay(React) {
     return function ViewSwitcherOverlay() {
         const [mode, setMode] = React.useState('auto');
         const [inspect, setInspect] = React.useState(false);
         const [hover, setHover] = React.useState(null);
         const [toast, setToast] = React.useState('');
+        const [frame, setFrame] = React.useState(null);
+        const [anchor, setAnchor] = React.useState(null);
         React.useEffect(() => {
-            document.documentElement.setAttribute(ROOT_ATTR, mode);
-        }, [mode]);
+            const update = () => {
+                const next = findBrowserFrame();
+                setFrame(next);
+                if (next === null) {
+                    setAnchor((previous) => (previous === null ? previous : null));
+                    return;
+                }
+                const rect = next.getBoundingClientRect();
+                const top = Math.round(rect.top);
+                const right = Math.round(window.innerWidth - rect.right);
+                setAnchor((previous) => previous !== null && previous.top === top && previous.right === right ? previous : { top, right });
+            };
+            update();
+            const onResize = () => update();
+            const observer = new MutationObserver(update);
+            observer.observe(document.body, { childList: true, subtree: true });
+            window.addEventListener('resize', onResize);
+            const timer = window.setInterval(update, 750);
+            return () => {
+                window.removeEventListener('resize', onResize);
+                observer.disconnect();
+                window.clearInterval(timer);
+            };
+        }, []);
+        React.useEffect(() => {
+            if (frame === null || !document.body.contains(frame)) {
+                document.documentElement.setAttribute(ROOT_ATTR, mode);
+                return;
+            }
+            document.documentElement.removeAttribute(ROOT_ATTR);
+            resizeFrame(frame, mode);
+            return () => resizeFrame(frame, 'auto');
+        }, [mode, frame]);
         React.useEffect(() => {
             const onKeyDown = (event) => {
                 if (event.key === 'F1') {
@@ -207,6 +271,10 @@ function createOverlay(React) {
                 document.body.style.cursor = previousCursor;
             };
         }, [inspect]);
+        // On the desktop shell the toolbar only exists over a browser pane; without
+        // one it would sit on top of the window buttons.
+        if (frame === null && isDesktopShell())
+            return null;
         const buttons = MODES.map((candidate) => React.createElement('button', {
             key: candidate,
             type: 'button',
@@ -227,6 +295,7 @@ function createOverlay(React) {
                 className: 'dsh-vs-toolbar',
                 role: 'toolbar',
                 'aria-label': 'View mode switcher',
+                style: anchor === null ? undefined : { top: anchor.top + 8, right: Math.max(anchor.right + 8, 4) },
                 [OWN_ATTR]: '',
             }, ...buttons, toast === ''
                 ? null
@@ -250,10 +319,11 @@ function createOverlay(React) {
 }
 /**
  * The DSH desktop (Electron) shell owns its window chrome: the OS decides the
- * window size, so a view-mode toolbar there only collides with the
- * minimize/maximize/close buttons. The switcher is a web-UI tool, so it stays
- * out of the desktop shell. A page that deliberately embeds the client (the
- * demo page) can opt back in through `window.__DSH_VS_FORCE__`.
+ * window size, so a frame-wide toolbar there only collides with the
+ * minimize/maximize/close buttons. On desktop the switcher therefore attaches
+ * to the built-in browser pane instead of the window. A page that deliberately
+ * embeds the client (the demo page) can opt back in through
+ * `window.__DSH_VS_FORCE__`.
  */
 function isDesktopShell() {
     const globals = window;
@@ -267,8 +337,7 @@ function isDesktopShell() {
 }
 function apply(ctx, React) {
     if (isDesktopShell()) {
-        console.info('[dsh-view-switcher] DSH desktop shell detected: the switcher only runs in the web UI.');
-        return;
+        console.info('[dsh-view-switcher] DSH desktop shell: the switcher attaches to the built-in browser pane.');
     }
     ctx.effect(() => {
         const style = document.createElement('style');
