@@ -80,5 +80,8 @@ D:/DSHplugin/
   (bukan `src/index.ts` — Node tidak memetakan `./x.js` ke `x.ts`).
 - Setiap file tambahan di bawah `D:/DSHplugin` yang dimuat sebagai loader row
   perlu `package.json` sendiri, kalau tidak akan bentrok dengan nama paket ini.
+- `dist/` WAJIB di-commit (jangan di-.gitignore): `dsh plugin add github:...` memasang
+  isi repo apa adanya, dan `package.json` hanya mengekspos `dist/index.js` + `dist/client.js`.
+  Setiap perubahan `src/` → `pnpm build` → commit `src/` dan `dist/` bersama.
 - Type checking (tsc) dan loading runtime (cordis) adalah dua jalur independen.
 - `node --test` tanpa `--test-isolation=none` gagal `spawn EPERM` di sandbox Windows.

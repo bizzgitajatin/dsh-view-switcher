@@ -19,7 +19,7 @@ D:\DSHplugin\
 ├── src/
 │   ├── index.ts        # host half (inert, tanpa DOM)
 │   └── client.ts       # client half (toolbar, mode, inspektur)
-├── dist/               # hasil build (dibuat oleh "pnpm build")
+├── dist/               # hasil build — ikut di-commit (instalasi github: memakai isi repo)
 ├── test/
 │   ├── client.test.js     # test node:test + jsdom
 │   └── dev-server.cmd     # boot DSH dengan profil uji lokal
