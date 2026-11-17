@@ -227,10 +227,17 @@ test('desktop shell attaches the switcher to the built-in browser pane', async (
     await tick(80)
     assert.equal(frame.style.width, '768px', 'TABLET resizes the pane frame')
 
+    click(button('FULLHD'))
+    await tick(80)
+    assert.equal(frame.style.width, '1920px', 'FULLHD keeps its CSS width so the page reflows')
+    const zoom = Number(frame.style.zoom)
+    assert.ok(zoom > 0 && zoom < 1, 'FULLHD is scaled down instead of being capped by the pane')
+
     click(button('AUTO'))
     await tick(80)
     assert.equal(frame.style.width, '', 'AUTO hands the width back to the layout')
     assert.equal(frame.style.flex, '', 'AUTO restores the flex sizing')
+    assert.equal(frame.style.zoom, '', 'AUTO removes the scale')
   })
 
   await t.test('inspects inside the pane through executeJavaScript', async () => {

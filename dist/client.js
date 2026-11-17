@@ -158,22 +158,54 @@ function findBrowserFrame() {
     }
     return fallback;
 }
-/** Resize the pane frame itself; AUTO hands the width back to the layout. */
+/** Width the pane can actually show, in CSS pixels. */
+function paneAvailableWidth(frame) {
+    const parent = frame.parentElement;
+    const parentWidth = parent === null ? 0 : parent.clientWidth;
+    return parentWidth > 0 ? parentWidth : window.innerWidth;
+}
+/**
+ * Resize the pane frame itself; AUTO hands the width back to the layout.
+ * A mode wider than the pane keeps its CSS width — so the page's own media
+ * queries see the target viewport — and is scaled down to fit the pane.
+ */
 function resizeFrame(frame, mode) {
     const width = WIDTH[mode];
+    const webview = isWebviewFrame(frame) ? frame : null;
     if (width === null) {
         frame.style.removeProperty('width');
         frame.style.removeProperty('max-width');
         frame.style.removeProperty('margin-inline');
         frame.style.removeProperty('flex');
+        frame.style.removeProperty('zoom');
+        if (webview !== null)
+            webview.setZoomFactor?.(1);
         return;
     }
-    frame.style.width = `${width}px`;
-    frame.style.maxWidth = '100%';
+    frame.style.removeProperty('max-width');
     // The pane frame is a flex item (`flex:auto` + `width:100%` in DSH's own CSS),
     // so a bare width is stretched back to full size. Stop it growing.
     frame.style.flex = '0 0 auto';
     frame.style.marginInline = 'auto';
+    const available = paneAvailableWidth(frame);
+    if (width <= available) {
+        frame.style.width = `${width}px`;
+        frame.style.removeProperty('zoom');
+        if (webview !== null)
+            webview.setZoomFactor?.(1);
+        return;
+    }
+    const scale = available / width;
+    if (webview !== null && typeof webview.setZoomFactor === 'function') {
+        // Electron panes zoom the guest, which also widens its CSS viewport.
+        frame.style.width = `${available}px`;
+        frame.style.removeProperty('zoom');
+        webview.setZoomFactor(scale);
+        return;
+    }
+    // Web iframes: keep the target width and scale the frame box to fit.
+    frame.style.width = `${width}px`;
+    frame.style.zoom = String(scale);
 }
 /** Electron `<webview>` panes can be scripted by the host; web iframes cannot. */
 function isWebviewFrame(frame) {
@@ -281,6 +313,7 @@ function createOverlay(React) {
         const [toast, setToast] = React.useState('');
         const [frame, setFrame] = React.useState(null);
         const [anchor, setAnchor] = React.useState(null);
+        let appliedMode = 'auto';
         React.useEffect(() => {
             const update = () => {
                 const next = findBrowserFrame();
@@ -295,7 +328,12 @@ function createOverlay(React) {
                 setAnchor((previous) => previous !== null && previous.top === top && previous.right === right ? previous : { top, right });
             };
             update();
-            const onResize = () => update();
+            const onResize = () => {
+                update();
+                const current = findBrowserFrame();
+                if (current !== null)
+                    resizeFrame(current, appliedMode);
+            };
             const observer = new MutationObserver(update);
             observer.observe(document.body, { childList: true, subtree: true });
             window.addEventListener('resize', onResize);
@@ -312,8 +350,12 @@ function createOverlay(React) {
                 return;
             }
             document.documentElement.removeAttribute(ROOT_ATTR);
+            appliedMode = mode;
             resizeFrame(frame, mode);
-            return () => resizeFrame(frame, 'auto');
+            return () => {
+                appliedMode = 'auto';
+                resizeFrame(frame, 'auto');
+            };
         }, [mode, frame]);
         React.useEffect(() => {
             const onKeyDown = (event) => {

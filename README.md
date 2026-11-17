@@ -81,9 +81,10 @@ dsh plugin --profile web add github:bizzgitajatin/dsh-view-switcher
   menempel di sudut kanan atas panel itu, dan tombol mode mengubah lebar halaman
   di dalam panel (AUTO = selebar panel). Berlaku untuk iframe (DSH web) maupun
   `<webview>` (DSH desktop), karena keduanya ditandai
-  `[data-sidebar-browser-frame]`. Lebar frame dibatasi lebar panel: mode yang
-  lebih lebar dari panel (mis. DESKTOP 1280 di panel 700px) tampak sama seperti
-  AUTO, sedangkan MOBILE/TABLET langsung menyempitkan halaman.
+  `[data-sidebar-browser-frame]`. Mode yang lebih lebar dari panel (mis. DESKTOP
+  1280 atau FULLHD 1920 di panel 700px) tetap memakai lebar CSS itu — jadi
+  layout halaman benar-benar berubah — lalu tampilannya diperkecil agar pas di
+  panel (webview lewat `setZoomFactor`, iframe lewat CSS `zoom`).
 - **Tampilan web DSH tanpa panel browser**: toolbar tetap di kanan atas dan
   mengatur lebar konten web view (`#root`).
 - **Inspektur**: tekan `F1` (kursor jadi crosshair), hover untuk melihat
