@@ -220,6 +220,7 @@ test('desktop shell attaches the switcher to the built-in browser pane', async (
     click(button('MOBILE'))
     await tick(80)
     assert.equal(frame.style.width, '375px', 'MOBILE resizes the pane frame')
+    assert.equal(frame.style.flex, '0 0 auto', 'the frame stops growing as a flex item')
     assert.equal(doc.documentElement.getAttribute('data-dsh-view-mode'), null, 'the page root is left alone')
 
     click(button('TABLET'))
@@ -229,6 +230,7 @@ test('desktop shell attaches the switcher to the built-in browser pane', async (
     click(button('AUTO'))
     await tick(80)
     assert.equal(frame.style.width, '', 'AUTO hands the width back to the layout')
+    assert.equal(frame.style.flex, '', 'AUTO restores the flex sizing')
   })
 
   await t.test('inspects inside the pane through executeJavaScript', async () => {
@@ -259,7 +261,20 @@ test('desktop shell attaches the switcher to the built-in browser pane', async (
       calls.some((code) => code.includes('__dshVsGuestStop')),
       'leaving inspect mode stops the guest inspector',
     )
-    frame.remove()
+  })
+
+  await t.test('does not highlight the DSH chrome while a pane is open', async () => {
+    doc.dispatchEvent(new shellDom.window.KeyboardEvent('keydown', { key: 'F1', bubbles: true, cancelable: true }))
+    await tick(100)
+    const outside = doc.createElement('div')
+    doc.body.appendChild(outside)
+    outside.dispatchEvent(new shellDom.window.MouseEvent('mousemove', { bubbles: true, clientX: 10, clientY: 10 }))
+    await tick(80)
+    assert.equal(container.querySelector('.dsh-vs-highlight'), null, 'the host does not highlight DSH elements')
+    outside.remove()
+    doc.dispatchEvent(new shellDom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await tick(80)
+    doc.querySelector('[data-sidebar-browser-frame]').remove()
   })
 
   await t.test('cleanup releases the overlay', async () => {

@@ -165,10 +165,14 @@ function resizeFrame(frame, mode) {
         frame.style.removeProperty('width');
         frame.style.removeProperty('max-width');
         frame.style.removeProperty('margin-inline');
+        frame.style.removeProperty('flex');
         return;
     }
     frame.style.width = `${width}px`;
     frame.style.maxWidth = '100%';
+    // The pane frame is a flex item (`flex:auto` + `width:100%` in DSH's own CSS),
+    // so a bare width is stretched back to full size. Stop it growing.
+    frame.style.flex = '0 0 auto';
     frame.style.marginInline = 'auto';
 }
 /** Electron `<webview>` panes can be scripted by the host; web iframes cannot. */
@@ -331,6 +335,13 @@ function createOverlay(React) {
                 setHover(null);
                 return;
             }
+            // With a browser pane open the inspector belongs to the page inside it
+            // (guest script); highlighting the DSH chrome around the pane only
+            // confuses. Without a pane, it inspects the DSH UI as before.
+            if (frame !== null) {
+                setHover(null);
+                return;
+            }
             const previousCursor = document.body.style.cursor;
             document.body.style.cursor = 'crosshair';
             const onMove = (event) => {
@@ -372,7 +383,7 @@ function createOverlay(React) {
                 document.removeEventListener('click', onClick, true);
                 document.body.style.cursor = previousCursor;
             };
-        }, [inspect]);
+        }, [inspect, frame]);
         // Inside the browser pane the page is cross-origin, so the host cannot walk
         // its DOM. Electron webviews accept scripted inspection; web iframes are
         // reported as unreachable instead of silently inspecting the frame element.
