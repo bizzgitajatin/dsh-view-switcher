@@ -405,6 +405,9 @@ pnpm test       # node:test + jsdom</code></pre>
 <script src="vendor/react.production.min.js"></script>
 <script src="vendor/react-dom.production.min.js"></script>
 <script>
+  // This page is the plugin's own test bed: it draws the toolbar even when the
+  // page is previewed inside the DSH desktop shell, which normally stays clean.
+  window.__DSH_VS_FORCE__ = true
   window.__ModuleLoader__ = {
     load(registration) {
       window.__dshRegistration = registration

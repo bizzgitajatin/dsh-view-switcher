@@ -153,3 +153,59 @@ test('client plugin registers, renders, switches modes, inspects and cleans up',
     assert.equal(document.documentElement.getAttribute('data-dsh-view-mode'), null, 'cleanup clears the root attribute')
   })
 })
+
+test('stays dormant inside the DSH desktop shell', async (t) => {
+  const shellDom = new JSDOM('<!doctype html><html><head></head><body><div id="root"></div></body></html>', {
+    url: 'http://localhost/',
+    pretendToBeVisual: true,
+    runScripts: 'outside-only',
+  })
+  shellDom.window.dshPlatform = { platform: 'win32' }
+  let shellRegistration = null
+  shellDom.window.__ModuleLoader__ = {
+    load(value) {
+      shellRegistration = value
+    },
+  }
+  vm.runInContext(
+    readFileSync(new URL('../dist/client.js', import.meta.url), 'utf8'),
+    shellDom.getInternalVMContext(),
+  )
+
+  const plugin = shellRegistration.factory(() => React)
+  let effects = 0
+  let injects = 0
+  const disposers = []
+  const ctx = {
+    effect(effect) {
+      effects += 1
+      const cleanup = effect()
+      if (typeof cleanup === 'function') disposers.push(cleanup)
+    },
+    slots: {
+      inject() {
+        injects += 1
+      },
+      register() {
+        throw new Error('the desktop shell must not register the overlay')
+      },
+    },
+  }
+
+  plugin.apply(ctx)
+
+  await t.test('does not touch the DOM or the overlay slot', () => {
+    assert.equal(effects, 0, 'no effect is registered in the desktop shell')
+    assert.equal(injects, 0, 'no overlay is contributed in the desktop shell')
+    assert.equal(shellDom.window.document.getElementById('dsh-view-switcher-styles'), null)
+  })
+
+  await t.test('__DSH_VS_FORCE__ opts a page back in', () => {
+    shellDom.window.__DSH_VS_FORCE__ = true
+    plugin.apply(ctx)
+    assert.equal(effects, 1, 'the forced page registers its effect')
+    assert.equal(injects, 1, 'the forced page contributes the overlay')
+    assert.ok(shellDom.window.document.getElementById('dsh-view-switcher-styles') !== null)
+    for (const dispose of disposers) dispose()
+  })
+})

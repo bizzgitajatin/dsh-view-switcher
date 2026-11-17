@@ -82,6 +82,15 @@ dsh plugin --profile web add github:bizzgitajatin/dsh-view-switcher
   selector dan kotak sorot, klik untuk menyalin. Klik pertama tidak diteruskan
   ke aplikasi; mode keluar dengan `Esc` atau `F1`.
 
+### Khusus DSH desktop (Electron)
+
+Di dalam aplikasi DSH desktop, plugin **tidak** menampilkan toolbar: ukuran
+jendela diatur OS, jadi toolbar di sana hanya bertabrakan dengan tombol
+minimize/maximize/close. Plugin mendeteksi shell desktop (`Electron/` pada user
+agent, protokol `dsh-app:`, atau bridge `dsh`/`dshPlatform`) lalu berhenti diam.
+Toolbar hanya aktif di tampilan web DSH (browser). Halaman yang memang ingin
+memaksa tampil — seperti halaman demo — bisa menyetel `window.__DSH_VS_FORCE__ = true`.
+
 ## Demo lokal
 
 `demo/index.html` adalah halaman contoh (mock halaman repo GitHub) yang memuat

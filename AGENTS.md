@@ -85,3 +85,7 @@ D:/DSHplugin/
   Setiap perubahan `src/` → `pnpm build` → commit `src/` dan `dist/` bersama.
 - Type checking (tsc) dan loading runtime (cordis) adalah dua jalur independen.
 - `node --test` tanpa `--test-isolation=none` gagal `spawn EPERM` di sandbox Windows.
+- Di DSH desktop (Electron) plugin sengaja tidak menampilkan toolbar: deteksi lewat
+  `Electron/` di user agent, protokol `dsh-app:`, atau bridge `dsh`/`dshPlatform`.
+  Jangan "memperbaiki" ini dengan memaksa tampil; halaman uji bisa memakai
+  `window.__DSH_VS_FORCE__ = true` (lihat `demo/index.html`).

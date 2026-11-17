@@ -324,7 +324,33 @@ function createOverlay(React: ReactLike): unknown {
   }
 }
 
+/**
+ * The DSH desktop (Electron) shell owns its window chrome: the OS decides the
+ * window size, so a view-mode toolbar there only collides with the
+ * minimize/maximize/close buttons. The switcher is a web-UI tool, so it stays
+ * out of the desktop shell. A page that deliberately embeds the client (the
+ * demo page) can opt back in through `window.__DSH_VS_FORCE__`.
+ */
+function isDesktopShell(): boolean {
+  const globals = window as unknown as {
+    dsh?: unknown
+    dshPlatform?: unknown
+    dshDesktop?: unknown
+    dshDesktopBoot?: unknown
+    __DSH_VS_FORCE__?: unknown
+  }
+  if (globals.__DSH_VS_FORCE__ === true) return false
+  if (globals.dsh || globals.dshPlatform || globals.dshDesktop || globals.dshDesktopBoot) return true
+  if (location.protocol === 'dsh-app:') return true
+  return /Electron\//.test(navigator.userAgent)
+}
+
 function apply(ctx: ClientContext, React: ReactLike): void {
+  if (isDesktopShell()) {
+    console.info('[dsh-view-switcher] DSH desktop shell detected: the switcher only runs in the web UI.')
+    return
+  }
+
   ctx.effect(() => {
     const style = document.createElement('style')
     style.id = STYLE_ID
