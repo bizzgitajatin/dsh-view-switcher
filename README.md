@@ -93,6 +93,9 @@ supaya tata letaknya ikut menyempit saat plugin mengubah lebar `#root`. Halaman
 yang hanya memakai media query viewport akan tetap terlihat selebar layar
 walaupun mode MOBILE aktif.
 
+Tangkapan layar hasil demo (1280×900): `demo/screenshots/demo-auto.jpg`,
+`demo-mobile.jpg`, `demo-inspect.jpg`.
+
 ## Lisensi
 
 MIT — lihat [LICENSE](LICENSE).
