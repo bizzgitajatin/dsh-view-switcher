@@ -44,5 +44,20 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bizzgitajatin/dsh-view-switcher.git"
+  },
+  "homepage": "https://github.com/bizzgitajatin/dsh-view-switcher#readme",
+  "bugs": {
+    "url": "https://github.com/bizzgitajatin/dsh-view-switcher/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "view-switcher",
+    "inspector"
+  ],
   "license": "MIT"
 }

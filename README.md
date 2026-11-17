@@ -58,8 +58,17 @@ Profil uji hidup di `.test-home\` (dibuat sekali dengan
 
 ## Instalasi ke DSH
 
+Dari folder lokal:
+
 ```cmd
 dsh plugin --profile web add D:\DSHplugin
+:: lalu restart DSH
+```
+
+Langsung dari GitHub:
+
+```cmd
+dsh plugin --profile web add github:bizzgitajatin/dsh-view-switcher
 :: lalu restart DSH
 ```
 
