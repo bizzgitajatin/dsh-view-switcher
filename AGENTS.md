@@ -91,3 +91,8 @@ D:/DSHplugin/
   (`[data-sidebar-browser-frame]`, iframe di web / `<webview>` di desktop) dan
   mengubah lebar frame itu. Tanpa panel, tidak ada toolbar.
   Halaman uji bisa memakai `window.__DSH_VS_FORCE__ = true` (lihat `demo/index.html`).
+- Inspektur isi panel: untuk `<webview>` dipakai `webview.executeJavaScript`
+  (skrip `GUEST_INSPECTOR` menyorot & menyimpan selector di
+  `window.__dshVsPicked`, host polling 250 ms lalu menyalinnya). iframe lintas-origin
+  di DSH web tidak bisa dijangkau — tampilkan pesan, jangan diam-diam
+  menginspeksi elemen frame.

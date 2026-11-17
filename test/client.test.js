@@ -229,6 +229,36 @@ test('desktop shell attaches the switcher to the built-in browser pane', async (
     click(button('AUTO'))
     await tick(80)
     assert.equal(frame.style.width, '', 'AUTO hands the width back to the layout')
+  })
+
+  await t.test('inspects inside the pane through executeJavaScript', async () => {
+    const frame = doc.querySelector('[data-sidebar-browser-frame]')
+    const calls = []
+    let picked = ''
+    frame.executeJavaScript = async (code) => {
+      calls.push(code)
+      return code.includes('__dshVsPicked') ? picked : 'ok'
+    }
+
+    doc.dispatchEvent(new shellDom.window.KeyboardEvent('keydown', { key: 'F1', bubbles: true, cancelable: true }))
+    await tick(150)
+    assert.ok(
+      calls.some((code) => code.includes('__dshVsGuest === true')),
+      'the guest inspector is installed inside the webview',
+    )
+
+    picked = 'button.primary'
+    await tick(400)
+    const toast = container.querySelector('.dsh-vs-toast')
+    assert.ok(toast !== null, 'the guest selection is reported back')
+    assert.match(toast.textContent, /copied button\.primary/, 'the guest selector is copied')
+
+    doc.dispatchEvent(new shellDom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await tick(120)
+    assert.ok(
+      calls.some((code) => code.includes('__dshVsGuestStop')),
+      'leaving inspect mode stops the guest inspector',
+    )
     frame.remove()
   })
 

@@ -86,8 +86,11 @@ dsh plugin --profile web add github:bizzgitajatin/dsh-view-switcher
   mengatur lebar konten web view (`#root`).
 - **Inspektur**: tekan `F1` (kursor jadi crosshair), hover untuk melihat
   selector dan kotak sorot, klik untuk menyalin. Klik pertama tidak diteruskan
-  ke aplikasi; mode keluar dengan `Esc` atau `F1`. Inspektur bekerja pada DOM
-  DSH, bukan isi halaman di dalam panel browser (panel itu cross-origin).
+  ke aplikasi; mode keluar dengan `Esc` atau `F1`. Di dalam panel Browser:
+  pada DSH desktop (`<webview>`) inspektur menyuntik skrip ke halaman lewat
+  `executeJavaScript`, jadi selector diambil dari DOM halaman itu sendiri;
+  pada DSH web (iframe lintas-origin) isi panel memang tidak bisa dijangkau dan
+  plugin menampilkan pesan singkat.
 
 ### Khusus DSH desktop (Electron)
 

@@ -215,6 +215,110 @@ function resizeFrame(frame: HTMLElement, mode: ViewMode): void {
   frame.style.marginInline = 'auto'
 }
 
+type WebviewElement = HTMLElement & { executeJavaScript?(code: string): Promise<unknown> }
+
+/** Electron `<webview>` panes can be scripted by the host; web iframes cannot. */
+function isWebviewFrame(frame: HTMLElement): frame is WebviewElement {
+  return frame.dataset.sidebarBrowserFrame === 'webview' || frame.tagName.toLowerCase() === 'webview'
+}
+
+/**
+ * Runs INSIDE the browser page. Draws its own outline/tooltip (the host cannot
+ * read the guest DOM) and stores the picked selector on `window.__dshVsPicked`,
+ * which the host polls through `webview.executeJavaScript`.
+ */
+const GUEST_INSPECTOR = String.raw`(function () {
+  if (window.__dshVsGuest === true) return 'already'
+  window.__dshVsGuest = true
+  window.__dshVsPicked = null
+  var ESCAPE = /([^a-zA-Z0-9_-])/g
+  var outline = document.createElement('div')
+  outline.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;' +
+    'outline:2px solid #3b82f6;outline-offset:-2px;border-radius:2px;display:none'
+  var tip = document.createElement('div')
+  tip.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#0f172a;' +
+    'color:#e2e8f0;border:1px solid #3b82f6;border-radius:4px;padding:3px 7px;' +
+    'font:12px/1.4 Menlo,Consolas,monospace;white-space:nowrap;max-width:70vw;' +
+    'overflow:hidden;text-overflow:ellipsis;display:none'
+  document.documentElement.appendChild(outline)
+  document.documentElement.appendChild(tip)
+  function selectorFor(element) {
+    if (element.id) return '#' + element.id.replace(ESCAPE, '\\$1')
+    var parts = []
+    var node = element
+    for (var depth = 0; depth < 4 && node && node.nodeType === 1; depth += 1) {
+      var part = node.tagName.toLowerCase()
+      if (node.classList.length > 0 && node.classList.length <= 2) {
+        for (var i = 0; i < node.classList.length; i += 1) {
+          part += '.' + node.classList[i].replace(ESCAPE, '\\$1')
+        }
+      }
+      var parent = node.parentElement
+      if (parent) {
+        var same = 0
+        for (var j = 0; j < parent.children.length; j += 1) {
+          if (parent.children[j].tagName === node.tagName) same += 1
+        }
+        if (same > 1) {
+          part += ':nth-of-type(' + (Array.prototype.indexOf.call(parent.children, node) + 1) + ')'
+        }
+      }
+      parts.unshift(part)
+      node = parent
+    }
+    return parts.join(' > ')
+  }
+  function move(event) {
+    var element = event.target
+    if (!element || element === outline || element === tip) return
+    if (element === document.documentElement || element === document.body) return
+    var rect = element.getBoundingClientRect()
+    outline.style.display = 'block'
+    outline.style.left = rect.left + 'px'
+    outline.style.top = rect.top + 'px'
+    outline.style.width = rect.width + 'px'
+    outline.style.height = rect.height + 'px'
+    tip.textContent = selectorFor(element)
+    tip.style.display = 'block'
+    tip.style.left = Math.min(event.clientX + 12, window.innerWidth - 40) + 'px'
+    tip.style.top = Math.min(event.clientY + 14, window.innerHeight - 28) + 'px'
+  }
+  function click(event) {
+    if (event.target === outline || event.target === tip) return
+    event.preventDefault()
+    event.stopPropagation()
+    window.__dshVsPicked = selectorFor(event.target)
+  }
+  function key(event) {
+    if (event.key === 'Escape') stop()
+  }
+  function stop() {
+    document.removeEventListener('mousemove', move, true)
+    document.removeEventListener('click', click, true)
+    document.removeEventListener('keydown', key, true)
+    outline.remove()
+    tip.remove()
+    window.__dshVsGuest = false
+    window.__dshVsGuestStop = null
+  }
+  window.__dshVsGuestStop = stop
+  document.addEventListener('mousemove', move, true)
+  document.addEventListener('click', click, true)
+  document.addEventListener('keydown', key, true)
+  return 'installed'
+})()`
+
+const GUEST_PICKED = `(function () {
+  var value = window.__dshVsPicked
+  window.__dshVsPicked = null
+  return value === null || value === undefined ? '' : String(value)
+})()`
+
+const GUEST_STOP = `(function () {
+  if (typeof window.__dshVsGuestStop === 'function') window.__dshVsGuestStop()
+  return true
+})()`
+
 function createOverlay(React: ReactLike): unknown {
   return function ViewSwitcherOverlay(): unknown {
     const [mode, setMode] = React.useState<ViewMode>('auto')
@@ -290,6 +394,7 @@ function createOverlay(React: ReactLike): unknown {
       const onMove = (event: MouseEvent): void => {
         const target = event.target instanceof Element ? event.target : null
         if (target === null || isOwnUi(target) || target === document.documentElement) return
+        if (target.closest(FRAME_SELECTOR) !== null) return
         const rect = target.getBoundingClientRect()
         const tooltipWidth = Math.min(selectorFor(target).length * 7 + 14, window.innerWidth * 0.6)
         setHover({
@@ -306,6 +411,7 @@ function createOverlay(React: ReactLike): unknown {
       const onClick = (event: MouseEvent): void => {
         const target = event.target instanceof Element ? event.target : null
         if (target === null || isOwnUi(target)) return
+        if (target.closest(FRAME_SELECTOR) !== null) return
         event.preventDefault()
         event.stopPropagation()
         const selector = selectorFor(target)
@@ -323,6 +429,49 @@ function createOverlay(React: ReactLike): unknown {
         document.body.style.cursor = previousCursor
       }
     }, [inspect])
+
+    // Inside the browser pane the page is cross-origin, so the host cannot walk
+    // its DOM. Electron webviews accept scripted inspection; web iframes are
+    // reported as unreachable instead of silently inspecting the frame element.
+    React.useEffect(() => {
+      if (!inspect || frame === null) return
+
+      if (isWebviewFrame(frame)) {
+        const webview = frame
+        const run = (code: string): Promise<unknown> =>
+          webview.executeJavaScript === undefined
+            ? Promise.resolve(null)
+            : webview.executeJavaScript(code).catch(() => null)
+
+        void run(GUEST_INSPECTOR)
+        const timer = window.setInterval(() => {
+          void run(GUEST_PICKED).then((value) => {
+            if (typeof value !== 'string' || value === '') return
+            void copyText(value).then(() => {
+              setToast(`copied ${value}`)
+              window.setTimeout(() => setToast(''), 1600)
+            })
+          })
+        }, 250)
+        return () => {
+          window.clearInterval(timer)
+          void run(GUEST_STOP)
+        }
+      }
+
+      let sameOrigin = true
+      try {
+        sameOrigin = (frame as HTMLIFrameElement).contentDocument !== null
+      } catch {
+        sameOrigin = false
+      }
+      if (!sameOrigin) {
+        setToast('Panel browser lintas-origin: inspektur hanya menjangkau UI DSH')
+        const timer = window.setTimeout(() => setToast(''), 2600)
+        return () => window.clearTimeout(timer)
+      }
+      return
+    }, [inspect, frame])
 
     // On the desktop shell the toolbar only exists over a browser pane; without
     // one it would sit on top of the window buttons.
