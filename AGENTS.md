@@ -24,6 +24,8 @@ Lokasi proyek: `D:/DSHplugin`
   `.dsh-vs-toolbar` ada di DOM dan klik mode mengubah `data-dsh-view-mode`.
 - Verifikasi cleanup: unmount/hapus plugin → tidak ada style, listener, atau
   timer yang tersisa.
+- Demo visual: `pnpm build; pnpm demo`, buka `demo/index.html` (variasi:
+  `#mode=mobile`, `#inspect`) — dipakai untuk screenshot/uji tanpa DSH.
 
 ## Struktur Proyek
 D:/DSHplugin/
@@ -43,6 +45,12 @@ D:/DSHplugin/
 ├── test/
 │ ├── client.test.js
 │ └── dev-server.cmd
+├── demo/
+│ ├── index.html        (mock repo GitHub + wiring __ModuleLoader__)
+│ ├── client.js         (salinan dist/client.js — dibuat `pnpm demo`)
+│ ├── prepare.mjs
+│ ├── fetch-vendor.mjs
+│ └── vendor/           (React 18 UMD untuk demo offline)
 ├── dist/               (hasil build)
 └── scratch-plugin/
   ├── cordis.yml

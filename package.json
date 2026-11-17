@@ -28,6 +28,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test --test-isolation=none test/client.test.js",
     "smoke": "node --test --test-isolation=none test/client.test.js",
+    "demo": "node demo/prepare.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "peerDependencies": {

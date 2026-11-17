@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThinkPad/DSHplugin — demo dsh-view-switcher</title>
+<style>
+  :root {
+    --bg-color: #0d1117;
+    --header-bg: #161b22;
+    --border-color: #30363d;
+    --text-main: #c9d1d9;
+    --text-muted: #8b949e;
+    --link-color: #58a6ff;
+    --btn-green: #238636;
+    --btn-green-hover: #2ea043;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* The plugin resizes this container when a view mode is picked. */
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    transition: width 0.2s ease, max-width 0.2s ease;
+    container-type: inline-size;
+  }
+
+  .global-header {
+    background-color: var(--header-bg);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .global-header svg { fill: #ffffff; width: 32px; height: 32px; flex: 0 0 auto; }
+  .search-bar {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--text-main);
+    width: 100%;
+    max-width: 320px;
+    font: inherit;
+  }
+  .user-chip { margin-left: auto; color: var(--text-main); font-weight: 600; white-space: nowrap; }
+
+  .repo-header {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 24px 0;
+  }
+  .repo-title {
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .repo-title .owner { color: var(--link-color); font-weight: 400; }
+  .repo-title .name { color: var(--link-color); font-weight: 700; }
+  .badge {
+    border: 1px solid var(--border-color);
+    border-radius: 2em;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .repo-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 8px 12px;
+    color: var(--text-main);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  .tab:hover { border-bottom-color: #6e7681; }
+  .tab.active { border-bottom-color: #f78166; font-weight: 600; }
+  .tab-count {
+    background: rgba(110, 118, 129, 0.4);
+    padding: 2px 6px;
+    border-radius: 2em;
+    font-size: 12px;
+  }
+
+  .repo-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .main-column { flex: 1; min-width: 0; }
+  .sidebar { width: 296px; flex-shrink: 0; }
+
+  .file-tree {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .file-tree-header {
+    background-color: var(--header-bg);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .file-tree-header .user { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .avatar { width: 20px; height: 20px; border-radius: 50%; background: #555; flex: 0 0 auto; }
+  .commit-msg {
+    color: var(--text-main);
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .commit-msg:hover { color: var(--link-color); }
+
+  .btn-green {
+    background-color: var(--btn-green);
+    color: #ffffff;
+    border: 1px solid rgba(240, 246, 252, 0.1);
+    padding: 5px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-green:hover { background-color: var(--btn-green-hover); }
+  .btn-green:focus-visible { outline: 2px solid var(--link-color); outline-offset: 2px; }
+
+  .file-list { list-style: none; margin: 0; padding: 0; }
+  .file-item {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .file-item:last-child { border-bottom: none; }
+  .file-item:hover { background-color: rgba(255, 255, 255, 0.03); }
+  .file-icon { color: var(--text-muted); fill: currentColor; flex: 0 0 auto; }
+  .file-name { color: var(--text-main); text-decoration: none; flex: 1; min-width: 0; }
+  .file-name:hover { color: var(--link-color); }
+  .commit-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 160px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .readme-box { border: 1px solid var(--border-color); border-radius: 6px; }
+  .readme-header {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .readme-content { padding: 32px; }
+  .readme-content h1 { border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+  .readme-content h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 24px; }
+  .readme-content code {
+    background: rgba(110, 118, 129, 0.4);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.92em;
+  }
+  .readme-content pre {
+    background: var(--header-bg);
+    padding: 16px;
+    border-radius: 6px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+  }
+  .readme-content pre code { background: transparent; padding: 0; }
+
+  .sidebar-section { margin-bottom: 24px; }
+  .sidebar-section + .sidebar-section { border-top: 1px solid var(--border-color); padding-top: 24px; }
+  .sidebar-section h3 { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+  .sidebar-section p { color: var(--text-muted); margin: 0 0 8px; }
+  .sidebar-links { display: flex; flex-direction: column; gap: 8px; }
+  .sidebar-links a { color: var(--link-color); text-decoration: none; }
+  .sidebar-links a:hover { text-decoration: underline; }
+  /* Keep link hit areas at least 24px tall. */
+  .commit-msg, .file-name, .sidebar-links a { padding-block: 2px; }
+
+  .repo-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--text-muted); }
+
+  .lang-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--border-color);
+    margin-bottom: 8px;
+  }
+  .lang-bar-fill { width: 88%; background: #3178c6; }
+  .lang-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; flex-wrap: wrap; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot-ts { background: #3178c6; }
+  .dot-css { background: #563d7c; }
+  .dot-md { background: #8b949e; }
+
+  /* Container queries: follow the width the plugin gives #root, not the viewport. */
+  @container (max-width: 900px) {
+    .sidebar { display: none; }
+    .repo-content { padding-inline: 16px; }
+    .commit-info { display: none; }
+  }
+
+  @container (max-width: 560px) {
+    .search-bar { display: none; }
+    .global-header { padding-inline: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="root">
+  <header class="global-header">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+    <input type="text" class="search-bar" placeholder="Search or jump to..." aria-label="Search">
+  </header>
+
+  <div class="repo-header">
+    <div class="repo-title">
+      <span class="owner">ThinkPad</span> / <span class="name">DSHplugin</span>
+      <span class="badge">Public</span>
+    </div>
+    <nav class="repo-tabs">
+      <a href="#" class="tab active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.72 3.22a.75.75 0 011.06 1.06L2.06 8l3.72 3.72a.75.75 0 11-1.06 1.06L.47 8.53a.75.75 0 010-1.06l4.25-4.25zm6.56 0a.75.75 0 10-1.06 1.06L13.94 8l-3.72 3.72a.75.75 0 101.06 1.06l4.25-4.25a.75.75 0 000-1.06l-4.25-4.25z"></path></svg>
+        Code
+      </a>
+      <a href="#" class="tab">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"></path><path fill-rule="evenodd" d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"></path></svg>
+        Issues <span class="tab-count">0</span>
+      </a>
+      <a href="#" class="tab">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"></path></svg>
+        Pull requests <span class="tab-count">0</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="repo-content">
+    <div class="main-column">
+      <div class="file-tree">
+        <div class="file-tree-header">
+          <div class="user">
+            <div class="avatar"></div>
+            <span style="font-weight: 600;">ThinkPad</span>
+            <a href="#" class="commit-msg">feat: rilis v0.4.1 — plugin dua-half...</a>
+          </div>
+          <button class="btn-green" type="button">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"></path></svg>
+            Code
+          </button>
+        </div>
+        <ul class="file-list">
+          <li class="file-item">
+            <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.75 1A1.75 1.75 0 000 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0016 13.25v-8.5A1.75 1.75 0 0014.25 3H7.5a.25.25 0 01-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75zM1.5 2.75a.25.25 0 01.25-.25H5a.25.25 0 01.2.1l.9 1.2c.14.2.36.3.6.3h7.55a.25.25 0 01.25.25v8.5a.25.25 0 01-.25.25H1.75a.25.25 0 01-.25-.25V2.75z"></path></svg>
+            <a href="#" class="file-name">src</a>
+            <span class="commit-info">feat: rilis v0.4.1</span>
+          </li>
+          <li class="file-item">
+            <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.75 1A1.75 1.75 0 000 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0016 13.25v-8.5A1.75 1.75 0 0014.25 3H7.5a.25.25 0 01-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75zM1.5 2.75a.25.25 0 01.25-.25H5a.25.25 0 01.2.1l.9 1.2c.14.2.36.3.6.3h7.55a.25.25 0 01.25.25v8.5a.25.25 0 01-.25.25H1.75a.25.25 0 01-.25-.25V2.75z"></path></svg>
+            <a href="#" class="file-name">test</a>
+            <span class="commit-info">feat: rilis v0.4.1</span>
+          </li>
+          <li class="file-item">
+            <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V6h-2.75A1.75 1.75 0 018 4.25V1.5H3.75zM10.5 1.5v2.75c0 .138.112.25.25.25h2.75L10.5 1.5z"></path></svg>
+            <a href="#" class="file-name">.gitignore</a>
+            <span class="commit-info">feat: rilis v0.4.1</span>
+          </li>
+          <li class="file-item">
+            <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V6h-2.75A1.75 1.75 0 018 4.25V1.5H3.75zM10.5 1.5v2.75c0 .138.112.25.25.25h2.75L10.5 1.5z"></path></svg>
+            <a href="#" class="file-name">LICENSE</a>
+            <span class="commit-info">feat: rilis v0.4.1</span>
+          </li>
+          <li class="file-item">
+            <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V6h-2.75A1.75 1.75 0 018 4.25V1.5H3.75zM10.5 1.5v2.75c0 .138.112.25.25.25h2.75L10.5 1.5z"></path></svg>
+            <a href="#" class="file-name">package.json</a>
+            <span class="commit-info">feat: rilis v0.4.1</span>
+          </li>
+          <li class="file-item">
+            <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V6h-2.75A1.75 1.75 0 018 4.25V1.5H3.75zM10.5 1.5v2.75c0 .138.112.25.25.25h2.75L10.5 1.5z"></path></svg>
+            <a href="#" class="file-name">README.md</a>
+            <span class="commit-info">feat: rilis v0.4.1</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="readme-box">
+        <div class="readme-header">
+          <svg class="file-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V6h-2.75A1.75 1.75 0 018 4.25V1.5H3.75zM10.5 1.5v2.75c0 .138.112.25.25.25h2.75L10.5 1.5z"></path></svg>
+          README.md
+        </div>
+        <div class="readme-content">
+          <h1>dsh-view-switcher</h1>
+          <p>Plugin DeepSeek Harness (DSH) dua-half (Host + Client) untuk mengatur lebar tampilan web dan menginspeksi elemen.</p>
+
+          <h2>Fitur</h2>
+          <ol>
+            <li><strong>Sakelar Tampilan</strong>: mode AUTO, MOBILE, TABLET, DESKTOP, dan FULLHD.</li>
+            <li><strong>Inspektur Elemen</strong>: tekan <code>F1</code>, arahkan kursor, lalu klik untuk menyalin CSS selector ke clipboard.</li>
+            <li><strong>Arsitektur dua-half</strong>: host Node.js inert, semua UI di client lewat <code>dsh.client</code>.</li>
+          </ol>
+
+          <h2>Build &amp; Test</h2>
+          <pre><code>pnpm install
+pnpm build      # tsc &rarr; dist/
+pnpm test       # node:test + jsdom</code></pre>
+
+          <h2>Lisensi</h2>
+          <p>MIT</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+      <section class="sidebar-section">
+        <h3>Tentang</h3>
+        <p>Plugin DSH dua-half (Host + Client) untuk mengatur lebar tampilan web dan menginspeksi elemen.</p>
+        <div class="sidebar-links">
+          <a href="#">Readme</a>
+          <a href="#">Lisensi MIT</a>
+          <a href="#">Aktivitas</a>
+        </div>
+      </section>
+
+      <section class="sidebar-section">
+        <h3>Info repo</h3>
+        <ul class="repo-facts">
+          <li>20 commit</li>
+          <li>3 kontributor</li>
+          <li>0 bintang</li>
+          <li>0 menonton</li>
+          <li>0 fork</li>
+        </ul>
+      </section>
+
+      <section class="sidebar-section">
+        <h3>Rilis</h3>
+        <p>Tidak ada rilis terbit</p>
+      </section>
+
+      <section class="sidebar-section">
+        <h3>Paket</h3>
+        <p>Tidak ada paket terbit</p>
+      </section>
+
+      <section class="sidebar-section">
+        <h3>Bahasa</h3>
+        <div class="lang-bar" aria-hidden="true"><span class="lang-bar-fill"></span></div>
+        <p class="lang-legend"><span class="dot dot-ts"></span>TypeScript 88% <span class="dot dot-css"></span>CSS 9% <span class="dot dot-md"></span>Lainnya 3%</p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<!-- Demo wiring: emulate the DSH client module loader + shell.overlay slot. -->
+<div id="dsh-vs-demo-overlay"></div>
+
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script>
+  window.__ModuleLoader__ = {
+    load(registration) {
+      window.__dshRegistration = registration
+    },
+  }
+</script>
+<script src="client.js"></script>
+<script>
+  ;(function bootstrapViewSwitcher() {
+    const React = window.React
+    const registration = window.__dshRegistration
+    const mount = document.getElementById('dsh-vs-demo-overlay')
+
+    function fail(message) {
+      const box = document.createElement('pre')
+      box.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483647;margin:0;padding:12px;border-radius:6px;background:#7f1d1d;color:#fee2e2;font:12px/1.5 ui-monospace,monospace;max-width:70vw;white-space:pre-wrap'
+      box.textContent = 'demo failed: ' + message
+      document.body.appendChild(box)
+      throw new Error(message)
+    }
+
+    if (!registration) fail('client.js did not register with __ModuleLoader__')
+    if (!React || !window.ReactDOM) fail('react vendor bundle missing')
+
+    const cleanups = []
+    let overlay = null
+    const ctx = {
+      effect(effect) {
+        const dispose = effect()
+        if (typeof dispose === 'function') cleanups.push(dispose)
+      },
+      slots: {
+        inject(slot, contribute) {
+          contribute()
+        },
+        register(options, component) {
+          overlay = component
+          return () => {
+            overlay = null
+          }
+        },
+      },
+    }
+
+    const plugin = registration.factory((id) => {
+      if (id === 'react') return React
+      throw new Error('unexpected module request: ' + id)
+    })
+
+    plugin.apply(ctx)
+    if (!overlay) fail('plugin did not register an overlay component')
+
+    const root = window.ReactDOM.createRoot(mount)
+    root.render(React.createElement(overlay))
+    window.__dshViewSwitcherDemo = {
+      cleanup() {
+        root.unmount()
+        for (const dispose of cleanups) dispose()
+      },
+    }
+
+    // Handy for repeatable screenshots: #mode=mobile or #inspect
+    let activationTries = 0
+    function activateFromHash() {
+      // Wait for the plugin's React overlay to commit before poking at it.
+      if (!document.querySelector('.dsh-vs-btn') && activationTries++ < 120) {
+        window.setTimeout(activateFromHash, 16)
+        return
+      }
+      const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const mode = params.get('mode')
+      if (mode) {
+        const label = mode.toUpperCase()
+        const button = Array.from(document.querySelectorAll('.dsh-vs-btn')).find(function (candidate) {
+          return candidate.textContent !== null && candidate.textContent.trim() === label
+        })
+        if (button) button.click()
+      }
+      if (params.has('inspect')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }))
+        // The inspector attaches its mousemove listener on the next render.
+        window.setTimeout(function hoverSubject() {
+          const subject =
+            document.querySelector('.repo-title .name') ||
+            document.querySelector('.readme-content h2') ||
+            document.querySelector('.repo-title')
+          if (!subject) return
+          const rect = subject.getBoundingClientRect()
+          subject.dispatchEvent(
+            new MouseEvent('mousemove', {
+              bubbles: true,
+              clientX: rect.left + Math.min(rect.width / 2, 160),
+              clientY: rect.top + rect.height / 2,
+            }),
+          )
+        }, 60)
+      }
+    }
+    activateFromHash()
+  })()
+</script>
+</body>
+</html>
