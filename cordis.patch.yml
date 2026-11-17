@@ -1,0 +1,4 @@
+# Patch bundle untuk didistribusikan lewat `dsh plugin add`
+- insert:
+    - id: dsh-view-switcher
+      name: dsh-view-switcher

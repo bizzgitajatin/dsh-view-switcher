@@ -1,0 +1,350 @@
+/**
+ * Client half of dsh-view-switcher.
+ *
+ * Emitted as ONE classic script (no imports, no exports) and loaded by the
+ * DSH web client module loader: `window.__ModuleLoader__.load({ id, factory })`.
+ * The factory returns a Cordis plugin whose `apply` registers a frame-wide
+ * overlay entry in the `shell.overlay` slot.
+ */
+
+interface ModuleRegistration {
+  id: string
+  factory(require: (id: string) => unknown): unknown
+}
+
+interface LoaderWindow {
+  __ModuleLoader__?: { load(registration: ModuleRegistration): void }
+}
+
+interface ReactLike {
+  Fragment: unknown
+  createElement(type: unknown, props?: unknown, ...children: unknown[]): unknown
+  useState<T>(initial: T): [T, (next: T | ((prev: T) => T)) => void]
+  useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void
+}
+
+interface ClientSlots {
+  inject(slot: string, contribute: () => void | (() => void)): void
+  register(options: Record<string, unknown>, component: unknown): () => void
+}
+
+interface ClientContext {
+  effect(effect: () => void | (() => void)): void
+  slots: ClientSlots
+}
+
+type ViewMode = 'auto' | 'mobile' | 'tablet' | 'desktop' | 'fullhd'
+
+const MODES: readonly ViewMode[] = ['auto', 'mobile', 'tablet', 'desktop', 'fullhd']
+const WIDTH: Record<ViewMode, number | null> = {
+  auto: null,
+  mobile: 375,
+  tablet: 768,
+  desktop: 1280,
+  fullhd: 1920,
+}
+const ROOT_ATTR = 'data-dsh-view-mode'
+const OWN_ATTR = 'data-dsh-vs-ui'
+const STYLE_ID = 'dsh-view-switcher-styles'
+
+const STYLES = [
+  'html[data-dsh-view-mode] #root {',
+  '  width: var(--dsh-vs-width) !important;',
+  '  max-width: var(--dsh-vs-width) !important;',
+  '  margin-inline: auto !important;',
+  '  transition: width 0.2s ease, max-width 0.2s ease;',
+  '}',
+  `[${ROOT_ATTR}="mobile"] { --dsh-vs-width: 375px; }`,
+  `[${ROOT_ATTR}="tablet"] { --dsh-vs-width: 768px; }`,
+  `[${ROOT_ATTR}="desktop"] { --dsh-vs-width: 1280px; }`,
+  `[${ROOT_ATTR}="fullhd"] { --dsh-vs-width: 1920px; }`,
+  '.dsh-vs-toolbar {',
+  '  position: fixed; top: 10px; right: 10px; z-index: 2147483000;',
+  '  display: flex; align-items: center; gap: 4px; padding: 4px;',
+  '  background: rgba(18, 18, 18, 0.88); border: 1px solid rgba(255, 255, 255, 0.14);',
+  '  border-radius: 8px; pointer-events: auto;',
+  '  font: 11px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;',
+  '  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);',
+  '}',
+  '.dsh-vs-btn {',
+  '  padding: 4px 9px; border: 0; border-radius: 5px; cursor: pointer;',
+  '  background: rgba(255, 255, 255, 0.12); color: #eaeaea;',
+  '  font: inherit; letter-spacing: 0.4px; transition: background 0.15s ease;',
+  '}',
+  '.dsh-vs-btn:hover { background: rgba(255, 255, 255, 0.26); }',
+  '.dsh-vs-btn--active { background: #3b82f6; color: #fff; }',
+  '.dsh-vs-btn--inspect { background: rgba(220, 38, 38, 0.55); }',
+  '.dsh-vs-btn--inspect.dsh-vs-btn--active { background: #dc2626; }',
+  '.dsh-vs-highlight {',
+  '  position: fixed; z-index: 2147482998; pointer-events: none;',
+  '  border: 2px solid #3b82f6; border-radius: 2px; box-sizing: border-box;',
+  '  background: rgba(59, 130, 246, 0.12);',
+  '}',
+  '.dsh-vs-tooltip {',
+  '  position: fixed; z-index: 2147482999; pointer-events: none;',
+  '  max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;',
+  '  padding: 3px 7px; border-radius: 4px;',
+  '  background: rgba(18, 18, 18, 0.94); color: #fff;',
+  '  font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;',
+  '}',
+  '.dsh-vs-toast {',
+  '  margin-left: 4px; padding: 3px 7px; border-radius: 4px;',
+  '  background: #14532d; color: #dcfce7; font: inherit;',
+  '}',
+].join('\n')
+
+interface HoverState {
+  selector: string
+  left: number
+  top: number
+  width: number
+  height: number
+  tipLeft: number
+  tipTop: number
+}
+
+function cssEscape(value: string): string {
+  const scope = globalThis as { CSS?: { escape?: (input: string) => string } }
+  const escape = scope.CSS?.escape
+  if (typeof escape === 'function') return escape(value)
+  return value.replace(/[^a-zA-Z0-9_-]/g, (char) => `\\${char}`)
+}
+
+/** Build a short, readable selector: id → data-testid → classes → nth-of-type path. */
+function selectorFor(element: Element): string {
+  if (element.id) return `#${cssEscape(element.id)}`
+
+  const parts: string[] = []
+  let node: Element | null = element
+  for (let depth = 0; node !== null && depth < 4; depth += 1) {
+    if (node.id) {
+      parts.unshift(`#${cssEscape(node.id)}`)
+      break
+    }
+    const testId = node.getAttribute('data-testid')
+    if (testId !== null && testId !== '') {
+      parts.unshift(`[data-testid="${cssEscape(testId)}"]`)
+      break
+    }
+    let part = node.tagName.toLowerCase()
+    const classes = Array.from(node.classList)
+      .filter((name) => !name.startsWith('dsh-vs-'))
+      .slice(0, 2)
+    if (classes.length > 0) part += classes.map((name) => `.${cssEscape(name)}`).join('')
+    const parent: Element | null = node.parentElement
+    if (parent !== null) {
+      const siblings = Array.from(parent.children).filter((child) => child.tagName === node?.tagName)
+      if (siblings.length > 1) part += `:nth-of-type(${siblings.indexOf(node) + 1})`
+    }
+    parts.unshift(part)
+    node = parent
+  }
+  return parts.join(' > ')
+}
+
+function isOwnUi(element: Element | null): boolean {
+  return element !== null && element.closest(`[${OWN_ATTR}]`) !== null
+}
+
+function fallbackCopy(text: string): void {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  try {
+    document.execCommand('copy')
+  } catch {
+    /* clipboard unavailable */
+  }
+  textarea.remove()
+}
+
+function copyText(text: string): Promise<void> {
+  const clipboard = navigator.clipboard as { writeText?: (value: string) => Promise<void> } | undefined
+  if (clipboard?.writeText === undefined) {
+    fallbackCopy(text)
+    return Promise.resolve()
+  }
+  return clipboard.writeText(text).catch(() => {
+    fallbackCopy(text)
+  })
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function createOverlay(React: ReactLike): unknown {
+  return function ViewSwitcherOverlay(): unknown {
+    const [mode, setMode] = React.useState<ViewMode>('auto')
+    const [inspect, setInspect] = React.useState(false)
+    const [hover, setHover] = React.useState<HoverState | null>(null)
+    const [toast, setToast] = React.useState('')
+
+    React.useEffect(() => {
+      document.documentElement.setAttribute(ROOT_ATTR, mode)
+    }, [mode])
+
+    React.useEffect(() => {
+      const onKeyDown = (event: KeyboardEvent): void => {
+        if (event.key === 'F1') {
+          event.preventDefault()
+          setInspect((previous) => !previous)
+          return
+        }
+        if (event.key === 'Escape') setInspect(false)
+      }
+      document.addEventListener('keydown', onKeyDown, true)
+      return () => {
+        document.removeEventListener('keydown', onKeyDown, true)
+      }
+    }, [])
+
+    React.useEffect(() => {
+      if (!inspect) {
+        setHover(null)
+        return
+      }
+
+      const previousCursor = document.body.style.cursor
+      document.body.style.cursor = 'crosshair'
+
+      const onMove = (event: MouseEvent): void => {
+        const target = event.target instanceof Element ? event.target : null
+        if (target === null || isOwnUi(target) || target === document.documentElement) return
+        const rect = target.getBoundingClientRect()
+        const tooltipWidth = Math.min(selectorFor(target).length * 7 + 14, window.innerWidth * 0.6)
+        setHover({
+          selector: selectorFor(target),
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          tipLeft: clamp(event.clientX + 12, 4, window.innerWidth - tooltipWidth - 4),
+          tipTop: clamp(event.clientY + 14, 4, window.innerHeight - 28),
+        })
+      }
+
+      const onClick = (event: MouseEvent): void => {
+        const target = event.target instanceof Element ? event.target : null
+        if (target === null || isOwnUi(target)) return
+        event.preventDefault()
+        event.stopPropagation()
+        const selector = selectorFor(target)
+        void copyText(selector).then(() => {
+          setToast(`copied ${selector}`)
+          window.setTimeout(() => setToast(''), 1600)
+        })
+      }
+
+      document.addEventListener('mousemove', onMove, true)
+      document.addEventListener('click', onClick, true)
+      return () => {
+        document.removeEventListener('mousemove', onMove, true)
+        document.removeEventListener('click', onClick, true)
+        document.body.style.cursor = previousCursor
+      }
+    }, [inspect])
+
+    const buttons = MODES.map((candidate) =>
+      React.createElement(
+        'button',
+        {
+          key: candidate,
+          type: 'button',
+          className: candidate === mode ? 'dsh-vs-btn dsh-vs-btn--active' : 'dsh-vs-btn',
+          title: WIDTH[candidate] === null ? 'Natural width' : `${WIDTH[candidate]}px`,
+          onClick: () => setMode(candidate),
+        },
+        candidate.toUpperCase(),
+      ),
+    )
+
+    buttons.push(
+      React.createElement(
+        'button',
+        {
+          key: 'inspect',
+          type: 'button',
+          className: inspect ? 'dsh-vs-btn dsh-vs-btn--inspect dsh-vs-btn--active' : 'dsh-vs-btn dsh-vs-btn--inspect',
+          title: 'Element inspector (F1)',
+          onClick: () => setInspect((previous) => !previous),
+        },
+        'INSPECT',
+      ),
+    )
+
+    const children: unknown[] = [
+      React.createElement(
+        'div',
+        {
+          key: 'toolbar',
+          className: 'dsh-vs-toolbar',
+          role: 'toolbar',
+          'aria-label': 'View mode switcher',
+          [OWN_ATTR]: '',
+        },
+        ...buttons,
+        toast === ''
+          ? null
+          : React.createElement('span', { key: 'toast', className: 'dsh-vs-toast', [OWN_ATTR]: '' }, toast),
+      ),
+    ]
+
+    if (inspect && hover !== null) {
+      children.push(
+        React.createElement('div', {
+          key: 'highlight',
+          className: 'dsh-vs-highlight',
+          [OWN_ATTR]: '',
+          style: { left: hover.left, top: hover.top, width: hover.width, height: hover.height },
+        }),
+        React.createElement(
+          'div',
+          {
+            key: 'tooltip',
+            className: 'dsh-vs-tooltip',
+            [OWN_ATTR]: '',
+            style: { left: hover.tipLeft, top: hover.tipTop },
+          },
+          hover.selector,
+        ),
+      )
+    }
+
+    return React.createElement(React.Fragment, null, ...children)
+  }
+}
+
+function apply(ctx: ClientContext, React: ReactLike): void {
+  ctx.effect(() => {
+    const style = document.createElement('style')
+    style.id = STYLE_ID
+    style.textContent = STYLES
+    document.head.appendChild(style)
+    document.documentElement.setAttribute(ROOT_ATTR, 'auto')
+    return () => {
+      style.remove()
+      document.documentElement.removeAttribute(ROOT_ATTR)
+    }
+  })
+
+  ctx.slots.inject('shell.overlay', () =>
+    ctx.slots.register({ name: 'shell.overlay', id: 'dsh-view-switcher', order: 1000 }, createOverlay(React)),
+  )
+}
+
+const loader = (window as unknown as LoaderWindow).__ModuleLoader__
+loader?.load({
+  id: 'dsh-view-switcher',
+  factory(require) {
+    const React = require('react') as ReactLike
+    return {
+      inject: ['slots'],
+      apply: (ctx: ClientContext) => apply(ctx, React),
+    }
+  },
+})

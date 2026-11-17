@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local DSH test profile and its artifacts
+.test-home/
+.pnpm-store/
+.pnpm-home/
+.tool-shim/
+.npm-cache/
+.refs-archive/
+.refs/
+.diag/
+
+# Logs & OS files
+*.log
+.DS_Store
+Thumbs.db
