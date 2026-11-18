@@ -94,7 +94,7 @@ Arsitektur saat ini:
 ### 3.8 Sandbox menyumbat profil asli
 - **Gejala**: `dsh web --dump-config` gagal
   `EPERM: operation not permitted, open
-  'C:\Users\ThinkPad\.dsh\profiles\web\cordis.yml'`.
+  '<profil-dsh>\profiles\web\cordis.yml'`.
 - **Solusi**: `DSH_HOME` diarahkan ke `<repo>\.test-home` sehingga semua
   tulisan profil masuk workspace.
 
