@@ -1,4 +1,5 @@
-# Debug lokal — plugin dibangun ke dist/ lalu diarahkan lewat file URL.
+# Debug lokal — plugin dibangun ke dist/ lalu dimuat lewat path relatif
+# (relatif terhadap folder file patch ini, jadi tidak ada path absolut mesin di repo).
 - insert:
     - id: dsh-view-switcher
-      name: 'file:///D:/DSHplugin/dist/index.js'
+      name: '../dist/index.js'

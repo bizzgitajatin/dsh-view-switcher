@@ -6,7 +6,7 @@ Plugin DSH yang menyediakan:
 1. Sakelar tampilan manual (auto / mobile / tablet / desktop / fullhd)
 2. Inspeksi elemen dengan kursor (hover sorot + klik ambil selector)
 
-Lokasi proyek: `D:/DSHplugin`
+Lokasi proyek: root repo ini
 
 ## Perintah Build & Jalankan
 
@@ -28,7 +28,7 @@ Lokasi proyek: `D:/DSHplugin`
   `#mode=mobile`, `#inspect`) — dipakai untuk screenshot/uji tanpa DSH.
 
 ## Struktur Proyek
-D:/DSHplugin/
+repo/
 ├── AGENTS.md
 ├── PLAN.md
 ├── ROADMAP.md
@@ -69,16 +69,17 @@ D:/DSHplugin/
 
 - ✅ **Boleh**: Menambah tombol, listener, kelas CSS, tooltip.
 - ⚠️ **Perlu konfirmasi**: Mengubah struktur DOM aplikasi DSH, menambah dependensi runtime.
-- 🚫 **Dilarang**: Hardcode path selain `D:/DSHplugin`, `setInterval` langsung di `apply`, commit `.env`.
+- 🚫 **Dilarang**: Hardcode path absolut mesin, `setInterval` langsung di `apply`, commit `.env`.
 
 ## Kesalahan Umum
 
 - Entry host tidak boleh menyentuh `document`/`window` — host berjalan di Node.
   Semua UI ada di `src/client.ts` yang dimuat browser lewat `exports["./client"]`.
 - `dsh.bundle` harus berupa objek `{ patch: "./cordis.patch.yml" }`, bukan string.
-- `scratch-plugin/cordis.yml` menunjuk hasil build: `file:///D:/DSHplugin/dist/index.js`
-  (bukan `src/index.ts` — Node tidak memetakan `./x.js` ke `x.ts`).
-- Setiap file tambahan di bawah `D:/DSHplugin` yang dimuat sebagai loader row
+- `scratch-plugin/cordis.yml` menunjuk hasil build lewat path relatif `../dist/index.js`
+  (relatif terhadap folder file patch; jangan tulis path absolut mesin).
+  Entry `src/index.ts` tidak bisa dipakai langsung — Node tidak memetakan `./x.js` ke `x.ts`.
+- Setiap file tambahan di bawah folder proyek yang dimuat sebagai loader row
   perlu `package.json` sendiri, kalau tidak akan bentrok dengan nama paket ini.
 - `dist/` WAJIB di-commit (jangan di-.gitignore): `dsh plugin add github:...` memasang
   isi repo apa adanya, dan `package.json` hanya mengekspos `dist/index.js` + `dist/client.js`.

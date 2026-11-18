@@ -15,7 +15,7 @@ mengatur lebar tampilan web DSH dan menginspeksi elemen.
 ## Struktur
 
 ```text
-D:\DSHplugin\
+repo\
 ├── src/
 │   ├── index.ts        # host half (inert, tanpa DOM)
 │   └── client.ts       # client half (toolbar, mode, inspektur)
@@ -54,14 +54,14 @@ test\dev-server.cmd
 ```
 
 Profil uji hidup di `.test-home\` (dibuat sekali dengan
-`dsh plugin --profile web add D:\DSHplugin`), lalu DSH membuka URL dengan token.
+`dsh plugin --profile web add .`), lalu DSH membuka URL dengan token.
 
 ## Instalasi ke DSH
 
 Dari folder lokal:
 
 ```cmd
-dsh plugin --profile web add D:\DSHplugin
+dsh plugin --profile web add .
 :: lalu restart DSH
 ```
 

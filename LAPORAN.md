@@ -1,4 +1,4 @@
-# Laporan: dsh-view-switcher (D:\DSHplugin)
+# Laporan: dsh-view-switcher (<repo>)
 
 Tanggal: 2026-11-17
 Status akhir: **plugin berjalan** — host half termuat, client half terdaftar di
@@ -11,13 +11,13 @@ HTTP 200 (10.983 byte), dan build + smoke test lulus.
 | --- | --- |
 | Nama paket | `dsh-view-switcher` |
 | Versi | 0.4.1 |
-| Lokasi | `D:\DSHplugin` |
+| Lokasi | `<repo>` |
 | Jenis | Plugin DSH (DeepSeek Harness) — dua half: host + client |
 | Fungsi | Sakelar lebar tampilan web DSH (AUTO / MOBILE / TABLET / DESKTOP / FULLHD) + inspektur elemen (F1, klik untuk salin selector) |
-| Entry host | `D:\DSHplugin\src\index.ts` → `dist\index.js` |
-| Entry client | `D:\DSHplugin\src\client.ts` → `dist\client.js`, diekspos sebagai `./client` |
-| Deklarasi | `D:\DSHplugin\package.json` → `dsh.bundle.patch` + `dsh.client.platform = "web"` |
-| Bundle row | `D:\DSHplugin\cordis.patch.yml` (id `dsh-view-switcher`) |
+| Entry host | `<repo>\src\index.ts` → `dist\index.js` |
+| Entry client | `<repo>\src\client.ts` → `dist\client.js`, diekspos sebagai `./client` |
+| Deklarasi | `<repo>\package.json` → `dsh.bundle.patch` + `dsh.client.platform = "web"` |
+| Bundle row | `<repo>\cordis.patch.yml` (id `dsh-view-switcher`) |
 
 Arsitektur saat ini:
 
@@ -44,9 +44,9 @@ Arsitektur saat ini:
 ## 3. Kendala & masalah yang ditemui
 
 ### 3.1 Loader tidak bisa memuat TypeScript langsung
-- **Gejala**: `dsh-view-switcher (file:///D:/DSHplugin/src/index.ts): failed to
+- **Gejala**: `dsh-view-switcher (file:///<repo>/src/index.ts): failed to
   import: Error [ERR_MODULE_NOT_FOUND]: Cannot find module
-  'D:\DSHplugin\src\view-switcher.js'`.
+  '<repo>\src\view-switcher.js'`.
 - **Sebab**: Node 24 type-stripping tidak memetakan specifier `.js` → `.ts`.
 - **Solusi**: compile ke `dist/`, arahkan `main`/`exports`/`cordis.patch.yml` ke
   berkas hasil build.
@@ -81,21 +81,21 @@ Arsitektur saat ini:
 ### 3.6 Sandbox Windows gagal (di luar proyek)
 - **Gejala**: semua perintah gagal sebelum jalan dengan
   `sandbox-local: windows-acl workspace grant failed: Win32Error:
-  SetNamedSecurityInfoW failed (Win32 5): grantWrite(D:\DSHplugin)`.
+  SetNamedSecurityInfoW failed (Win32 5): grantWrite(<repo>)`.
 - **Solusi**: pengguna memasang `dsh-acl-sandbox-patch` (0.1.2). Setelah GUI
   restart, perintah kembali normal. Tidak ada perubahan ACL manual.
 
 ### 3.7 pnpm store bentrok
-- **Gejala**: `pnpm now wants to use the store at "D:\DSHplugin\.pnpm-store\v11"
+- **Gejala**: `pnpm now wants to use the store at "<repo>\.pnpm-store\v11"
   ... node_modules was installed with a different major version of pnpm`.
 - **Solusi**: hapus profil uji lalu ulangi dengan
-  `npm_config_store_dir=D:\DSHplugin\.pnpm-store\v11` dan shim `pnpm.cmd`.
+  `npm_config_store_dir=<repo>\.pnpm-store\v11` dan shim `pnpm.cmd`.
 
 ### 3.8 Sandbox menyumbat profil asli
 - **Gejala**: `dsh web --dump-config` gagal
   `EPERM: operation not permitted, open
   'C:\Users\ThinkPad\.dsh\profiles\web\cordis.yml'`.
-- **Solusi**: `DSH_HOME` diarahkan ke `D:\DSHplugin\.test-home` sehingga semua
+- **Solusi**: `DSH_HOME` diarahkan ke `<repo>\.test-home` sehingga semua
   tulisan profil masuk workspace.
 
 ### 3.9 Flag launcher tidak sesuai dugaan
@@ -155,7 +155,7 @@ Arsitektur saat ini:
 ## 5. Cara menjalankan & memverifikasi
 
 ```cmd
-cd /d D:\DSHplugin
+cd /d <repo>
 node node_modules\typescript\bin\tsc        :: build ke dist\
 node --test --test-isolation=none test\client.test.js   :: test jsdom
 test\dev-server.cmd                         :: boot DSH dengan profil uji .test-home
@@ -164,7 +164,7 @@ test\dev-server.cmd                         :: boot DSH dengan profil uji .test-
 Instalasi ke DSH pengguna:
 
 ```cmd
-dsh plugin --profile web add D:\DSHplugin
+dsh plugin --profile web add <repo>
 :: lalu restart DSH
 ```
 
@@ -177,5 +177,5 @@ dsh plugin --profile web add D:\DSHplugin
 | boot `.test-home` | `dsh web: http://127.0.0.1:52673/?token=…` |
 | halaman | 38.328 byte, 72 entri boot, `dsh-view-switcher` muncul 5× |
 | bundle client | HTTP 200, 10.983 byte |
-| `review_audit D:\DSHplugin` | 71/100 — **snapshot kedaluwarsa**: file `zzz-probe.js` yang baru dibuat tidak menambah hitungan file (tetap 300), `README ✗`/`LICENSE ✗` padahal ada, dan `test/client.test.js` tidak terdeteksi |
+| `review_audit <repo>` | 71/100 — **snapshot kedaluwarsa**: file `zzz-probe.js` yang baru dibuat tidak menambah hitungan file (tetap 300), `README ✗`/`LICENSE ✗` padahal ada, dan `test/client.test.js` tidak terdeteksi |
 | `review_audit` pada salinan bersih (`.audit-copy`, 15 file) | **86/100** — Dokumen 100 (README ✓ LICENSE ✓ .gitignore ✓), Test 57 (1 test file terdeteksi), Struktur 88, Maintainability 90, Robustness 85, Security 90 |
